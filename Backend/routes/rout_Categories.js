@@ -6,7 +6,7 @@ const categories = express.Router();
 
 //Usuarios general
 categories.get("/", getCategories);
-//Admin                                                //put=update
+//Admin / put=update
 categories.put("/", [verifyToken, isAdmin, isRoot], updCategories);
 //User
 categories.post("/", [verifyToken, isUser, isRoot], addCategories);

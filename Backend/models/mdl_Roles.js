@@ -1,11 +1,11 @@
-import mongoose from "mongoose";
+const mongoose = require('mongoose');
 
-const schRoles = new mongoose.Schema(
-    {
-        name: { type: String, required: true },
-        level: { type: Number, required: true },
-        description: { type: String, required: true }
-    }
-);
+const schRoles = new mongoose.Schema({
+    name: { type: String, required: true },
+    level: { type: Number, required: true },
+    description: { type: String, required: true }
+});
 
-mongoose.model('Roles', schRoles);
+const Roles = mongoose.model("Roles", schRoles);
+
+module.exports = Roles;

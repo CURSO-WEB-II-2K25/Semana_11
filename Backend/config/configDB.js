@@ -1,12 +1,10 @@
 // Create the database variables
-
-/*const dbConfig = {
+const dbConfig = {
     HOST: "127.0.0.1",
     PORT: 27017,
     USER: "admin",
-    PASS: "parda99*",
-    DB: "mongologin",
+    PASS: "esteban2511",
+    DB: "practica03DB",
 };
 
-export default dbConfig;
-*/
+module.exports = dbConfig;

@@ -1,6 +1,9 @@
 # Semana_11
 Semana 11 repositorio original.
 
+# Documentació y aprobación de las pruebas
+- https://documenter.getpostman.com/view/45666071/2sB3BEoqSC 
+
 # Guia para el desarrollo de la Practica
 Step 01
 - Crear carpeta Backend

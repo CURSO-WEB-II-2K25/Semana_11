@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require('mongoose');
 
 const schUsers = new mongoose.Schema({
     fullname: { type: String, required: true },
@@ -8,4 +8,6 @@ const schUsers = new mongoose.Schema({
     rol: { type: String, required: true}
 });
 
-mongoose.model('Users', schUsers);
+const Users = mongoose.model("Users", schUsers);
+
+module.exports = Users;

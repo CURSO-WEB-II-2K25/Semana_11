@@ -69,7 +69,6 @@ export const signin = async (req, res) => {
         });
 
         var nivel = user.rol.toUpperCase();
-
         req.session.token = token;
 
         const msgJson = {
