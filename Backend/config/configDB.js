@@ -6,5 +6,4 @@ const dbConfig = {
     PASS: "esteban2511",
     DB: "practica03DB",
 };
-
 module.exports = dbConfig;

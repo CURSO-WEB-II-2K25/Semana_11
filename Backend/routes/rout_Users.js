@@ -1,11 +1,11 @@
-import express from "express";
-import { signup, signin, signout } from "../controllers/ctrl_Users.js";
-import { verifyRol, verifyDuplicates, isRoot } from "../middleware/func_Users.js";
+const express = require('express');
+const { signup, signin, signout } = require('../controllers/ctrl_Users.js');
+const { verifyToken ,verifyRol, verifyDuplicates, isRoot,isAdmin,isUser } = require('../middleware/func_Users.js');
 
 const users = express.Router();
 
-users.post("/signup", [verifyDuplicates, verifyRol, isRoot], signup);
-users.post("/signin", signin);
-users.post("/signout", signout);
+users.post('/signup', [verifyToken, isRoot, verifyDuplicates, verifyRol], signup);
+users.post('/signin', signin);
+users.post('/signout', signout);
 
-export default users ;
+module.exports = users;

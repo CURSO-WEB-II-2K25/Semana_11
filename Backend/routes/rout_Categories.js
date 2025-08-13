@@ -1,16 +1,21 @@
-import express from "express";
-import { getCategories, addCategories, updCategories, delCategories} from "../controllers/ctrl_Categories.js";
-import { verifyToken, isAdmin, isUser, isRoot } from "../middleware/func_Users.js";
-
+const express = require('express');
+const { getCategories, getCategoriesFoto, addCategories } = require('../controllers/ctrl_Categories.js');
+const { verifyToken,checkRoles,isAdmin, isUser, isRoot } = require('../middleware/func_Users.js');
+const multer = require('multer');
 const categories = express.Router();
+const subir = multer({ dest: 'subirfoto/' });
 
-//Usuarios general
-categories.get("/", getCategories);
-//Admin / put=update
-categories.put("/", [verifyToken, isAdmin, isRoot], updCategories);
-//User
-categories.post("/", [verifyToken, isUser, isRoot], addCategories);
-//Guest
-categories.delete("/", [verifyToken, isRoot], getCategories);
+// Usuarios general
+//categories.get("/imagenes/:id", getCategories);
+//categories.get("/foto/:id", getCategoriesFoto);
 
-export default categories ;
+// Usuarios general
+categories.get('/imagenes/:id', getCategories);
+categories.get('/foto/:id', getCategoriesFoto);
+
+// Root and User (acceso para roles 'user' o 'root')
+//categories.post("/imagenes", [verifyToken, isUser, isRoot, subir.array('imagen', 1)], addCategories);
+categories.post('/imagenes',[verifyToken, checkRoles(['user', 'root']), subir.array('imagen', 1)],addCategories);
+
+
+module.exports = categories;

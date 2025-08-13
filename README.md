@@ -28,7 +28,15 @@ Nota: Se tendra que ver lo siguiente:
 
 Step 02
 - Instalar las herramientas necesarias
-    - npm install --save express http-errors body-parser mongoose cors helmet multer
+    - npm install --save express http-errors body-parser mongoose cors helmet multer bcryptjs jsonwebtoken cookie-session
+
+## Generar clave secreta segura para la aplicación
+- Para proteger sesiones y tokens JWT, necesitas una clave secreta fuerte y aleatoria. Para generarla sigue estos pasos:
+  1. Abre la terminal o consola de comandos en tu computadora.
+  2. Ejecuta el siguiente comando para generar una clave secreta aleatoria de 64 caracteres hexadecimales:
+
+# ```bash
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 # Correr el archivo
   - node nombre_archivo.js

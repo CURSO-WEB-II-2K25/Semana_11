@@ -1,110 +1,105 @@
-import mongoose from "mongoose";
-
-// Import the secret key and the jsonwebtoken objects
-import secret from "../config/configSecret.js";
-import jsonwebtoken from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-
-// Create the database variable
+const mongoose = require('mongoose');
+const secret = require('../config/configSecret.js');
+const jsonwebtoken = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const Users = mongoose.model('Users');
 
-// Create the signup function
-export const signup = async (req, res, next) => {
+const signup = async (req, res) => {
+  try {
     const user = new Users({
-        fullname: req.body.fullname,
-        email: req.body.email,
-        username: req.body.username,
-        password: bcrypt.hashSync(req.body.password, 8),
-        rol: req.body.rol
+      fullname: req.body.fullname,
+      email: req.body.email,
+      username: req.body.username,
+      password: bcrypt.hashSync(req.body.password, 8),
+      rol: req.body.rol,
     });
 
-    await Users.insertMany(user).then(() => {
-        console.log("User was registered successfully!");
-        const msgJson = {
-            status_code: 200,
-            status_message: "OK",
-            body_message: "User was registered successfully!"
-        };
-        res.status(200).json(msgJson);
-    }).catch(err => {
-        console.log("error", err);
-        const msgJson = {
-            status_code: 500,
-            status_message: "Server error",
-            body_message: err
-        };
-        res.status(500).json(msgJson);
+    await user.save();
+
+    console.log('Usuario registrado exitosamente!'); 
+    res.status(200).json({
+      status_code: 200,
+      status_message: 'OK',
+      body_message: 'Usuario registrado exitosamente!',
     });
-}
-
-// Create the signin function
-export const signin = async (req, res) => {
-    await Users.findOne({username: req.body.username}).then((user) => {
-        if (!user) {
-            const msgJson = {
-                status_code: 404,
-                status_message: "Not found",
-                body_message: "The user not exists...!"
-            };
-
-            return res.status(404).send(msgJson);
-        }
-
-        var passwordIsValid = bcrypt.compareSync(
-            req.body.password,
-            user.password
-        );
-
-        if (!passwordIsValid) {
-            const msgJson = {
-                status_code: 401,
-                status_message: "Unauthorized",
-                body_message: "The password is invalid...!"
-            };
-            res.status(401).json(msgJson);
-        }
-
-        var token = jsonwebtoken.sign({ id: user._id }, secret, {
-            expiresIn: 86400, // 24 hours (60 secs * 60 mins * 24 hrs)
-        });
-
-        var nivel = user.rol.toUpperCase();
-        req.session.token = token;
-
-        const msgJson = {
-            status_code: 200,
-            status_message: "Ok",
-            body_message: {
-                id: user._id,
-                username: user.username,
-                email: user.email,
-                roles: nivel
-            }
-        };
-
-        res.status(200).send(msgJson);
-    }).catch(err => {
-        const msgJson = {
-            status_code: 500,
-            status_message: "Internal Server Error",
-            body_message: err
-        };
-        res.status(500).send(msgJson);
-    })
+  } catch (err) {
+    console.error('Erroe al registrar al usuario:', err);
+    res.status(500).json({
+      status_code: 500,
+      status_message: 'Server error',
+      body_message: err.message || err,
+    });
+  }
 };
 
-// Create the signout function
-export const signout = async (req, res) => {
-    try {
-        req.session = null;
-        console.log("The user has logged out...!");
-        const msgJson = {
-            status_code: 200,
-            status_message: "OK",
-            body_message: "The user has logged out...!"
-        };
-        res.status(200).json(msgJson);
-    } catch (err) {
-        this.next(err);
+const signin = async (req, res) => {
+  try {
+    const user = await Users.findOne({ username: req.body.username });
+
+    if (!user) {
+      return res.status(404).json({
+        status_code: 404,
+        status_message: 'Not found',
+        body_message: 'El usuario no existe...!',
+      });
     }
+
+    const passwordIsValid = bcrypt.compareSync(req.body.password, user.password);
+
+    if (!passwordIsValid) {
+      return res.status(401).json({
+        status_code: 401,
+        status_message: 'Unauthorized',
+        body_message: 'Contraseña Incorrecta...!',
+      });
+    }
+
+    const token = jsonwebtoken.sign({ id: user._id }, secret, { expiresIn: 86400 });
+
+    const nivel = user.rol.toUpperCase();
+    req.session.token = token;
+
+    res.status(200).json({
+      status_code: 200,
+      status_message: 'Ok',
+      body_message: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        roles: nivel,
+      },
+    });
+  } catch (err) {
+    console.error('Error en iniciar sesión:', err);
+    res.status(500).json({
+      status_code: 500,
+      status_message: 'Internal Server Error',
+      body_message: err.message || err,
+    });
+  }
+};
+
+const signout = async (req, res) => {
+  try {
+    req.session = null;
+    console.log('El usuario cerro sesión Satisfactoriamente...!');
+    res.status(200).json({
+      status_code: 200,
+      status_message: 'OK',
+      body_message: 'El usuario cerro sesión Satisfactoriamente...!',
+    });
+  } catch (err) {
+    console.error('Error en cerrar sesión:', err);
+    res.status(500).json({
+      status_code: 500,
+      status_message: 'Error en cerrar sesión',
+      body_message: err.message || err,
+    });
+  }
+};
+
+module.exports = {
+  signup,
+  signin,
+  signout,
 };

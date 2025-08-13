@@ -12,122 +12,136 @@ Profesor..: Jorge Ruiz (york)
 Estudiante: Esteban Amores and Laura Montero
 ========================================================================================
 */
-
-// cargar las librerias del hambiente del proyecto
-let cors = require('cors')
-const helmet = require("helmet");
+const cors = require('cors');
+const helmet = require('helmet');
 const express = require('express');
-let mongoose = require('mongoose');
-let createError = require("http-errors");
+const mongoose = require('mongoose');
+const createError = require('http-errors');
 const bodyParser = require('body-parser');
-
+const bcrypt = require('bcryptjs');
+const cookieSession = require('cookie-session');
 
 // crear la aplicacion 
-var app = express();
+const app = express();
 
-// Applicacion pasrse para soportar data en formato JSON
-app.use(bodyParser.json({type: "application/json"}));
+// Configuración CORS para tu frontend (ajusta el origen si es necesario)
+const corsOptions = {
+  origin: 'http://localhost:5000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+};
+app.use(cors(corsOptions));
 
-// Habilitar Cors
-app.use(cors());
+// Middleware para parsear JSON y urlencoded, Parsear JSON y urlencoded
+app.use(express.json());
+app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Habilitar Helmet para seguridad
+
+// Habilitar Helmet para seguridad HTTP
 app.use(helmet());
 
-// ---------------------------------------------------
-// Seccion - Crear la conexión a la base de datos
-// Nota: Esta linea de codigo es otra forma de crear y conectarse a la base de datos.
-// mongoose.connect('mongodb://admin:esteban2511@localhost:27017/',{dbName:'dbArticles'});
-// ---------------------------------------------------
-// Importar las variables de conexión a la base de datos
+// Configurar cookie-session correctamente para CommonJS
+const expiryDate = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+const cookieKey = require('./config/cookieSecret.js');
+app.use(
+  cookieSession({
+    name: 'L&E-session',
+    keys: [cookieKey], // OJO: Debes usar una clave secreta real y ponerla en variable de entorno
+    httpOnly: true,
+    expires: expiryDate,
+  })
+);
+
+// Importar variables de conexión
 const dbConfig = require('./config/configDB.js');
-mongoose.connect(`mongodb://${dbConfig.USER}:${dbConfig.PASS}@${dbConfig.HOST}/`,{ dbName: dbConfig.DB });
+mongoose.connect(`mongodb://${dbConfig.USER}:${dbConfig.PASS}@${dbConfig.HOST}/`, { dbName: dbConfig.DB });
+
+mongoose.connection.once('open', () => {
+    console.log('Connected to MongoDB');
+    // Llamar inicialización y luego crear root user
+    initial().then(() => {
+    createDefaultRootUser();
+    });
+});
+
+mongoose.connection.on('error', err => {
+    console.error('MongoDB error de coneccion:', err);
+});
+
+mongoose.connection.on('Desconectado', () => {
+    console.warn('MongoDB Desconectado');
+});
 
 // Cargar modelos 
 require('./models/mdl_Categories.js');
-require ('./models/mdl_Users.js');
-require ('./models/mdl_Roles.js');
+require('./models/mdl_Users.js');
+require('./models/mdl_Roles.js');
 
-//Crear las rutas de cada uno de los endpoints
-let indexRouter = require('./routes/rout_Index.js');
-let imgsRouter = require('./routes/rout_Img.js');
+// Rutas
+const indexRouter = require('./routes/rout_Index.js');
+const categoriesRouter = require('./routes/rout_Categories.js');
+const usersRouter = require('./routes/rout_Users.js');
 
-// Crear todas las rutas de escuchas de cada una de las rutas
 app.use('/', indexRouter);
-app.use('/imagenes', imgsRouter);
+app.use('/imagenes', categoriesRouter);
+app.use('/usuarios', usersRouter);
 
-// Ejecutar la API y crear el puerto de ecucha en el pouerto 5000
-let server = app.listen(5000, function () {
-    console.log(`Server escuchando en el puerto ${server.address().port}`);
-
-});
-
-/*
-// Create the initial roles if they do not exist
+// Crear roles iniciales
 async function initial() {
     const Roles = mongoose.model('Roles');
-
-    await Roles.estimatedDocumentCount().then((count) => {
+    try {
+        const count = await Roles.estimatedDocumentCount();
         if (count === 0) {
             const newRoles = [
-                {
-                    name: "guest",
-                    level: 1,
-                    description: "Guest-user"
-                },
-                {
-                    name: "user",
-                    level: 3,
-                    description: "Normal-user"
-                },
-                {
-                    name: "admin",
-                    level: 5,
-                    description: "Administrator"
-                },
-                {
-                    name: "root",
-                    level: 3,
-                    description: "Super-user"
-                }];
-
-            Roles.insertMany(newRoles).then(() => {
-                console.log("added 'guest', 'root' 'user' and 'admin' to roles collection");
-            }).catch(err => {
-                console.log("error", err);
-            });
+                { name: 'guest', level: 1, description: 'Guest-user' },
+                { name: 'user', level: 3, description: 'Normal-user' },
+                { name: 'admin', level: 5, description: 'Administrator' },
+                { name: 'root', level: 3, description: 'Super-user' },
+            ];
+            await Roles.insertMany(newRoles);
+            console.log("added 'guest', 'root', 'user' and 'admin' to roles collection");
         }
-    });
+    } catch (err) {
+        console.error('Error creating roles:', err);
+    }
 }
 
-// Crear usuario root por defecto si no existe
-import bcrypt from 'bcryptjs';
-
+// Crear usuario root por defecto
 async function createDefaultRootUser() {
     const Users = mongoose.model('Users');
     const Roles = mongoose.model('Roles');
 
-    // Verificar si el usuario 'root' ya existe
-    const existingUser = await Users.findOne({ username: 'root' });
-    if (existingUser) {
-        console.log("Root user already exists");
-        return;
+    try {
+        const existingUser = await Users.findOne({ username: 'root' });
+        if (existingUser) {
+            console.log("El usuario root ya existe.");
+            return;
+        }
+        const rootRole = await Roles.findOne({ name: 'root' });
+        if (!rootRole) {
+            console.error("El rol 'root' no existe. Asegúrate de que los roles se hayan creado correctamente.");
+            return;
+        }
+
+        const hashedPassword = await bcrypt.hash(dbConfig.PASS, 10);
+
+        const newUser = new Users({
+            username: 'root',
+            email: 'root@example.com',
+            password: hashedPassword,
+            rol: rootRole.name,  // Aquí asignas el string 'root'
+            fullname: 'Super Usuario Root'
+        });
+
+        await newUser.save();
+        console.log(`Default root user created (username: root, password: ${hashedPassword})`);
+    } catch (err) {
+        console.error('Error de crear el usuario root:', err);
     }
-
-    // Hashear la contraseña
-    const hashedPassword = await bcrypt.hash('provisional123', 10);
-
-    // Crear el usuario
-    const newUser = new Users({
-        username: 'root',
-        email: 'root@example.com',
-        password: hashedPassword,
-        roles: [rootRole._id]
-    });
-
-    await newUser.save();
-    console.log("Default root user created (username: root, password: provisional123)");
 }
-*/
 
-
+// Ejecutar servidor
+const server = app.listen(5000, () => {
+    console.log(`Server escuchando en el puerto ${server.address().port}`);
+});

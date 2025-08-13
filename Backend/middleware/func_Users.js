@@ -1,168 +1,173 @@
-import mongoose from "mongoose";
+const mongoose = require('mongoose');
+const secret = require('../config/configSecret.js');
+const jsonwebtoken = require('jsonwebtoken');
+const ROLES = ['admin', 'user', 'guest', 'root'];
 
-// Import the secret key and the jsonwebtoken objects
-import secret from "../config/configSecret.js";
-import jsonwebtoken from 'jsonwebtoken';
-
-// Creates the roles array
-const ROLES = ["admin", "user", "guest", "root"];
-
-// Creates the database variable
 const Users = mongoose.model('Users');
 
-// Create the verifyToken function
-export const verifyToken = (req, res, next) => {
-    let token = req.session.token;
-    if (!token) {
-        const msgJson = {
-            status_code: 403,
-            status_message: "Forbidden",
-            body_message: "The user does not have not access rights, please login first"
-        };
-        return res.status(403).send(msgJson);
-    }
-
-    jsonwebtoken.verify(token, secret, (err, decoded) => {
-        if (err) {
-            const msgJson = {
-                status_code: 401,
-                status_message: "Unauthorized",
-                body_message: "The user is not authorized"
-            };
-            return res.status(401).send(msgJson);
-        }
-        req.UserID = decoded.id;
-        next();
+const verifyToken = (req, res, next) => {
+  const token = req.session?.token;
+  if (!token) {
+    return res.status(403).json({
+      status_code: 403,
+      status_message: 'Forbidden',
+      body_message: 'No hay usuario autenticado. Debe iniciar sesión primero.',
     });
+  }
+
+  jsonwebtoken.verify(token, secret, (err, decoded) => {
+    if (err) {
+      return res.status(401).json({
+        status_code: 401,
+        status_message: 'Unauthorized',
+        body_message: 'El usuario no es autorizado. El token es inválido o ha expirado.',
+      });
+    }
+    req.UserID = decoded.id;
+    next();
+  });
 };
 
-export const verifyRol = (req, res, next) => {
-    if (req.body.rol) {
-        if (!ROLES.includes(req.body.rol)) {
-            const msgJson = {
-                status_code: 400,
-                status_message: "Bad request",
-                body_message: "The Rol not exists"
-            };
-            return res.status(400).send(msgJson);
-        }
+const verifyRol = (req, res, next) => {
+  if (req.body.rol) {
+    if (!ROLES.includes(req.body.rol)) {
+      return res.status(400).json({
+        status_code: 400,
+        status_message: 'Bad request',
+        body_message: 'El rol no es válido.',
+      });
+    }
+  }
+  next();
+};
+
+const verifyDuplicates = async (req, res, next) => {
+  try {
+    const userByUsername = await Users.findOne({username: req.body.username });
+    if (userByUsername) {
+      return res.status(400).json({
+        status_code: 400,
+        status_message: 'Bad request',
+        body_message: 'Error! Nombre de usuario ya existe.',
+      });
+    }
+
+    const userByEmail = await Users.findOne({ email: req.body.email });
+    if (userByEmail) {
+      return res.status(400).json({
+        status_code: 400,
+        status_message: 'Bad request',
+        body_message: 'Error! correo electrónico ya existe.',
+      });
     }
     next();
+  } catch (err) {
+    return res.status(500).json({
+      status_code: 500,
+      status_message: 'Internal server error',
+      body_message: err.message || err,
+    });
+  }
 };
 
-// Create the verifyDuplicates (username & eMail) function
-export const verifyDuplicates = async (req, res, next)  => {
-    let msgJson = {};
-    // Username validation
-    await Users.findOne({username: req.body.username}).then(user =>{
-        if (user) {
-            msgJson = {
-                status_code: 400,
-                status_message: "Bad request",
-                body_message: "Failed! The username is already in use!"
-            };
-        }
-    }).catch(err => {
-        msgJson = {
-            status_code: 500,
-            status_message: "Internal server error",
-            body_message: err
-        };
-    });
-
-    if (!msgJson.status_code) {
-        // Email validation
-        await Users.findOne({email: req.body.email}).then(user => {
-            if (user) {
-                const msgJson = {
-                    status_code: 400,
-                    status_message: "Bad request",
-                    body_message: "Failed! The eMail is already in use!"
-                };
-            }
-        }).catch(err => {
-            const msgJson = {
-                status_code: 500,
-                status_message: "Internal server error",
-                body_message: err
-            };
+// Middleware para validar que el rol sea uno de los permitidos (array de roles)
+const checkRoles = (roles) => {
+  return async (req, res, next) => {
+    try {
+      const user = await Users.findById(req.UserID);
+      if (!user) {
+        return res.status(404).json({
+          status_code: 404,
+          status_message: 'Not Found',
+          body_message: 'Usuario no autorizado.',
         });
+      }
+
+      if (roles.includes(user.rol)) {
+        return next();
+      }
+
+      return res.status(403).json({
+        status_code: 403,
+        status_message: 'Forbidden',
+        body_message: 'El usuario no tiene los permisos necesarios para acceder a este recurso.',
+      });
+    } catch (error) {
+      return res.status(500).json({
+        status_code: 500,
+        status_message: 'Internal Server Error',
+        body_message: error.message || error,
+      });
     }
-    if (msgJson.status_code) {
-        return res.status(msgJson.status_code).send(msgJson);
-    }
-    next();
+  };
 };
 
-export const isAdmin = async (req, res, next) => {
-    let msgJson = {};
-    await Users.findById(req.UserID).then(user => {
-        if (user.rol === "admin") {
-            console.log(user);
-            next();
-            return;
-        }
-        msgJson = {
-            status_code: 403,
-            status_message: "Forbidden",
-            body_message: "The user does not have the necessary permissions"
-        };
-    }).catch(err => {
-        msgJson = {
-            status_code: 500,
-            status_message: "Internal Server Error",
-            body_message: err
-        };
-    });
-    if (msgJson.status_code) {
-        return res.status(msgJson.status_code).send(msgJson);
+const isAdmin = async (req, res, next) => {
+  try {
+    const user = await Users.findById(req.UserID);
+    if (user?.rol === 'admin') {
+      return next();
     }
+    return res.status(403).json({
+      status_code: 403,
+      status_message: 'Forbidden',
+      body_message: 'El usuario no tiene los permisos necesarios para acceder a este recurso.',
+    });
+  } catch (err) {
+    return res.status(500).json({
+      status_code: 500,
+      status_message: 'Internal Server Error',
+      body_message: err.message || err,
+    });
+  }
 };
 
-export const isUser = async (req, res, next) => {
-    let msgJson = {};
-    await Users.findById(req.UserID).then(user => {
-        if (user.rol === "user") {
-            next();
-            return;
-        }
-        msgJson = {
-            status_code: 403,
-            status_message: "Forbidden",
-            body_message: "The current user does not have the minimum permissions"
-        };
-    }).catch(err => {
-        msgJson = {
-            status_code: 500,
-            status_message: "Internal Server Error",
-            body_message: err
-        };
-    });
-    if (msgJson.status_code) {
-        return res.status(msgJson.status_code).send(msgJson);
+const isUser = async (req, res, next) => {
+  try {
+    const user = await Users.findById(req.UserID);
+    if (user?.rol === 'user') {
+      return next();
     }
+    return res.status(403).json({
+      status_code: 403,
+      status_message: 'Forbidden',
+      body_message: 'El usuario no tiene los permisos necesarios para acceder a este recurso.',
+    });
+  } catch (err) {
+    return res.status(500).json({
+      status_code: 500,
+      status_message: 'Internal Server Error',
+      body_message: err.message || err,
+    });
+  }
 };
 
-export const isRoot = async (req, res, next) => {
-    let msgJson = {};
-    await Users.findById(req.UserID).then(user => {
-        if (user.rol === "root") {
-            next();
-            return;
-        }
-        msgJson = {
-            status_code: 403,
-            status_message: "Forbidden",
-            body_message: "The current user does not have the minimum permissions"
-        };
-    }).catch(err => {
-        msgJson = {
-            status_code: 500,
-            status_message: "Internal Server Error",
-            body_message: err
-        };
-    });
-    if (msgJson.status_code) {
-        return res.status(msgJson.status_code).send(msgJson);
+const isRoot = async (req, res, next) => {
+  try {
+    const user = await Users.findById(req.UserID);
+    if (user?.rol === 'root') {
+      return next();
     }
+    return res.status(403).json({
+      status_code: 403,
+      status_message: 'Forbidden',
+      body_message: 'El usuario no tiene los permisos necesarios para acceder a este recurso.',
+    });
+  } catch (err) {
+    return res.status(500).json({
+      status_code: 500,
+      status_message: 'Internal Server Error',
+      body_message: err.message || err,
+    });
+  }
+};
+
+module.exports = {
+  verifyToken,
+  verifyRol,
+  verifyDuplicates,
+  checkRoles,
+  isAdmin,
+  isUser,
+  isRoot,
 };
