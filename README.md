@@ -39,4 +39,5 @@ Step 02
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 
 # Correr el archivo
-  - node nombre_archivo.js
+  - cd backend
+  - node app.js
